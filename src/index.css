@@ -1,1 +1,70 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary-dark: #0d0d0d;
+  --color-secondary-dark: #1a1a1a;
+  --color-accent-blue: #3b82f6;
+  --color-accent-pink: #ec4899;
+  --color-accent-green: #10b981;
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #a0a0a0;
+
+  --font-sans: Inter, sans-serif;
+
+  --background-image-aurora:
+    radial-gradient(ellipse at top left, hsla(217, 100%, 50%, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, hsla(330, 100%, 50%, 0.2) 0%, transparent 50%);
+
+  --shadow-glow-blue: 0 0 15px 5px rgba(59, 130, 246, 0.3);
+  --shadow-glow-pink: 0 0 15px 5px rgba(236, 72, 153, 0.3);
+}
+
+@layer base {
+  @variant dark {
+    --color-primary-dark: #0d0d0d;
+    --color-secondary-dark: #1a1a1a;
+    --color-accent-blue: #3b82f6;
+    --color-accent-pink: #ec4899;
+    --color-accent-green: #10b981;
+    --color-text-primary: #e0e0e0;
+    --color-text-secondary: #a0a0a0;
+
+    --font-sans: Inter, sans-serif;
+
+    --background-image-aurora:
+      radial-gradient(ellipse at top left, hsla(217, 100%, 50%, 0.2) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, hsla(330, 100%, 50%, 0.2) 0%, transparent 50%);
+
+    --shadow-glow-blue: 0 0 15px 5px rgba(59, 130, 246, 0.3);
+    --shadow-glow-pink: 0 0 15px 5px rgba(236, 72, 153, 0.3);
+  }
+}
+
+body {
+  @apply bg-primary-dark text-text-primary font-sans antialiased;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar (optional, but nice for dark themes) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: theme('colors.secondary-dark');
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: theme('colors.accent-blue');
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: theme('colors.accent-pink');
+}
+
+/* Add any other global styles or component layer overrides here */
+.glassmorphic {
+  @apply bg-clip-padding backdrop-blur-lg backdrop-filter;
+}
