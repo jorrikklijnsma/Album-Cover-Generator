@@ -1,13 +1,21 @@
 // src/utils/modelData.ts
+export interface ModelParameterConstraints {
+  steps: { min: number; max: number; default: number };
+  width: { min: number; max: number; default: number; step: number };
+  height: { min: number; max: number; default: number; step: number };
+  guidance: { min: number; max: number; default: number; step: number };
+  // Add other relevant parameters like supported resolutions if fixed
+}
+
 export interface ImageModel {
   id: string;
   name: string;
   organization: string;
-  defaultStepsForPricing?: number; // Steps at which the listed pricePerMegapixel applies
-  pricePerMegapixel: number; // in cents
+  defaultStepsForPricing?: number;
+  pricePerMegapixel: number;
   notes?: string;
   isPro: boolean;
-  // minStepsForCostAdjustment is essentially defaultStepsForPricing
+  constraints: ModelParameterConstraints;
 }
 
 export const imageModels: ImageModel[] = [
@@ -18,6 +26,12 @@ export const imageModels: ImageModel[] = [
     pricePerMegapixel: 0, // Free
     notes: 'Free model, 10 img/min rate limit. Reduced performance.',
     isPro: false,
+    constraints: {
+      steps: { min: 1, max: 4, default: 4 }, // Guessed defaults, check API
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
   {
     id: 'black-forest-labs/FLUX.1-schnell',
@@ -27,6 +41,12 @@ export const imageModels: ImageModel[] = [
     pricePerMegapixel: 0.003 * 100, // $0.003 -> 0.3 cents per MP
     notes: 'Paid Turbo endpoint.',
     isPro: false,
+    constraints: {
+      steps: { min: 1, max: 12, default: 4 }, // Max steps might be low for this model
+      width: { min: 64, max: 1792, default: 1024, step: 32 },
+      height: { min: 64, max: 1792, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.0, step: 0.1 }, // Example
+    },
   },
   {
     id: 'black-forest-labs/FLUX.1-dev',
@@ -35,6 +55,12 @@ export const imageModels: ImageModel[] = [
     defaultStepsForPricing: 28,
     pricePerMegapixel: 0.025 * 100, // $0.025 -> 2.5 cents per MP
     isPro: false,
+    constraints: {
+      steps: { min: 1, max: 50, default: 28 }, // Max steps might be low for this model
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
   {
     // Assuming LoRA has its own model ID if you want to list it separately
@@ -44,6 +70,12 @@ export const imageModels: ImageModel[] = [
     defaultStepsForPricing: 28,
     pricePerMegapixel: 0.035 * 100, // $0.035 -> 3.5 cents per MP
     isPro: false, // Or true if it's considered a pro feature
+    constraints: {
+      steps: { min: 1, max: 50, default: 28 }, // Max steps might be low for this model
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
   {
     id: 'black-forest-labs/FLUX.1-canny',
@@ -53,6 +85,12 @@ export const imageModels: ImageModel[] = [
     pricePerMegapixel: 0.025 * 100, // $0.025 -> 2.5 cents per MP
     notes: 'ControlNet-style model, uses image_url for Canny edge detection map.',
     isPro: false, // Typically not 'Pro' in the sense of build tier, but advanced usage
+    constraints: {
+      steps: { min: 1, max: 50, default: 28 }, // Max steps might be low for this model
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
   {
     id: 'black-forest-labs/FLUX.1-depth',
@@ -62,6 +100,12 @@ export const imageModels: ImageModel[] = [
     pricePerMegapixel: 0.025 * 100, // $0.025 -> 2.5 cents per MP
     notes: 'ControlNet-style model, uses image_url for depth map.',
     isPro: false,
+    constraints: {
+      steps: { min: 1, max: 50, default: 28 }, // Max steps might be low for this model
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
   {
     id: 'black-forest-labs/FLUX.1-redux',
@@ -70,6 +114,12 @@ export const imageModels: ImageModel[] = [
     defaultStepsForPricing: 28,
     pricePerMegapixel: 0.025 * 100, // $0.025 -> 2.5 cents per MP
     isPro: false,
+    constraints: {
+      steps: { min: 1, max: 50, default: 28 }, // Max steps might be low for this model
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
   {
     id: 'black-forest-labs/FLUX.1.1-pro',
@@ -80,6 +130,12 @@ export const imageModels: ImageModel[] = [
     notes:
       'Pro model. Limited to Build Tier 2+. Requires credits. Step count does not alter price.',
     isPro: true,
+    constraints: {
+      steps: { min: 10, max: 50, default: 28 }, // Higher default/max for pro
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
   {
     id: 'black-forest-labs/FLUX.1-pro',
@@ -89,6 +145,12 @@ export const imageModels: ImageModel[] = [
     pricePerMegapixel: 0.05 * 100, // $0.050 -> 5.0 cents per MP
     notes: 'Pro model. Limited to Build Tier 2+. Requires credits.',
     isPro: true,
+    constraints: {
+      steps: { min: 10, max: 50, default: 28 }, // Higher default/max for pro
+      width: { min: 256, max: 1440, default: 1024, step: 32 },
+      height: { min: 256, max: 1440, default: 1024, step: 32 },
+      guidance: { min: 1, max: 10, default: 3.5, step: 0.1 },
+    },
   },
 ];
 

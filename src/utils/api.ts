@@ -1,121 +1,121 @@
 // src/utils/api.ts
 import Together from 'together-ai';
+import { imageModels } from './modelData';
 
-const PREVIEW_MODEL_ID = 'black-forest-labs/FLUX.1-schnell-Free';
-const ENHANCE_MODEL_ID = 'black-forest-labs/FLUX.1.1-pro';
+export interface ImageGenerationResult {
+  imageDataBase64: string; // Changed from imageUrl
+  seed: number; // We will now always send and thus "know" the seed
+}
 
 interface CallTogetherApiOptions {
   apiKey: string;
   prompt: string;
-  generationType: 'preview' | 'enhance';
-  referenceImageUrl?: string | null; // URL of the preview image for enhancement
-  width?: number;
-  height?: number;
+  modelId: string;
+  referenceImageUrl?: string | null; // This will be base64 if enhancing a preview
+  referenceImageSeed?: number | null; // If you want to pass the seed of the reference image
+  width: number;
+  height: number;
+  steps: number;
+  guidance: number;
+  seed: number; // Client-generated seed
   negativePrompt?: string;
-  steps?: number;
-  // Add other parameters from the API reference as needed
-  guidance?: number; // For controlling adherence, especially for enhance
 }
 
 export async function callTogetherApi({
   apiKey,
   prompt,
-  generationType,
-  referenceImageUrl,
-  width = 768, // Default, FLUX models often use 1024x1024
-  height = 768,
-  negativePrompt = 'text, watermark, blurry, ugly, deformed, noisy, malformed hands, messy, low quality, artifacts',
-  steps, // Will be set based on generationType
+  modelId,
+  // referenceImageUrl, // This parameter needs to be re-thought if it's for img2img from base64
+  width,
+  height,
+  steps,
   guidance,
-}: CallTogetherApiOptions): Promise<string> {
-  if (!apiKey) {
-    throw new Error('API Key is required to call Together API.');
-  }
+  seed, // Now a required parameter
+  negativePrompt = 'text, watermark, blurry, ugly, deformed, noisy, malformed hands, messy, low quality, artifacts',
+}: CallTogetherApiOptions): Promise<ImageGenerationResult> {
+  if (!apiKey) throw new Error('API Key is required.');
 
   const together = new Together({ apiKey });
 
-  let modelToUse: string;
-  let apiSteps: number;
-  let requestBody: Parameters<typeof together.images.create>[0];
-
-  if (generationType === 'preview') {
-    modelToUse = PREVIEW_MODEL_ID;
-    apiSteps = steps || 4; // Default steps for preview
-    requestBody = {
-      model: modelToUse,
-      prompt,
-      negative_prompt: negativePrompt,
-      width,
-      height,
-      steps: apiSteps,
-      n: 1, // Generate 1 image
-      response_format: 'url', // We want a URL for the image
-      // guidance: guidance || 3.5, // Default guidance, adjust if needed
-    };
-  } else {
-    // 'enhance'
-    if (!referenceImageUrl) {
-      throw new Error('Reference image URL is required for enhancement.');
-    }
-    modelToUse = ENHANCE_MODEL_ID;
-    apiSteps = steps || 30; // Potentially more steps for higher quality
-    requestBody = {
-      model: modelToUse,
-      prompt,
-      negative_prompt: negativePrompt,
-      width, // Should ideally match the preview image dimensions or be supported by the model
-      height,
-      steps: apiSteps,
-      n: 1,
-      image_url: referenceImageUrl, // Key parameter for using the preview as reference
-      response_format: 'url',
-      guidance: guidance || 5, // Potentially higher guidance to adhere to the reference image and prompt
-    };
+  const selectedModelInfo = imageModels.find(m => m.id === modelId);
+  if (!selectedModelInfo) {
+    throw new Error(`Model with ID ${modelId} not found in configuration.`);
   }
 
-  console.log(`Calling Together API with model: ${modelToUse}`, requestBody);
+  const requestBody: Parameters<typeof together.images.create>[0] = {
+    model: modelId,
+    prompt,
+    negative_prompt: negativePrompt,
+    width,
+    height,
+    steps,
+    n: 1,
+    response_format: 'base64',
+    guidance,
+    seed, // Pass the client-generated seed
+  };
+
+  // Handling referenceImageUrl for img2img models (like FLUX.1-canny, FLUX.1-depth, or Pro for refinement)
+  // The 'image_url' parameter in Together API expects a URL.
+  // If you have a base64 preview and want to use it as a reference for a Pro model (img2img style),
+  // you'd typically upload the base64 preview to a temporary host (or your own backend that returns a URL)
+  // and then pass *that* URL to `image_url`.
+  // For simplicity now, if `referenceImageUrl` is provided and it's a base64 string,
+  // we'll assume the selected `modelId` *cannot* directly take base64 for `image_url`.
+  // This part needs careful handling based on how Pro models use `image_url`.
+  // If FLUX Pro models can take a previous image as a style reference via URL, this is where it'd go.
+  // For now, let's remove `referenceImageUrl` from this direct API call and handle img2img chaining separately if needed.
+  // Or, if `FLUX.1.1-pro` uses `image_url` for refinement from a URL, we'd need the preview to be a URL.
+  // Given the CORS issue, getting a URL from the preview model is problematic without a proxy.
+  // Sticking to base64 output simplifies the preview stage.
+  // "Enhance" might mean "re-generate with same seed and prompt on a Pro model with more steps".
+
+  console.log(`Calling Together API with model: ${modelId}`, requestBody);
 
   try {
     const response = await together.images.create(requestBody);
-
     console.log('Together API Response:', response);
 
-    if (response.data && response.data.length > 0 && response.data[0].url) {
-      return response.data[0].url;
+    if (response.data && response.data.length > 0 && response.data[0].b64_json) {
+      return {
+        imageDataBase64: response.data[0].b64_json,
+        seed: seed, // Return the seed we sent
+      };
     } else if (response.error) {
-      // The SDK might structure errors differently, check its documentation or typical responses
       throw new Error(
         `Together API Error: ${response.error.message || JSON.stringify(response.error)}`
       );
     } else if (!response.data || response.data.length === 0) {
-      // Check for other error indications based on actual SDK behavior
-      let errorMessage = 'Image generation failed: No data returned.';
-      // The SDK might have specific error fields or structures
-      // e.g., if response.status is 'failed' or similar
+      let errorMessage = 'Image generation failed: No data returned from API.';
       if ((response as any).message) {
-        // Check for a general message field
         errorMessage = `Image generation failed: ${(response as any).message}`;
       } else if ((response as any).detail) {
-        // Some APIs use 'detail'
         errorMessage = `Image generation failed: ${(response as any).detail}`;
+      } else if (response.status_code && response.status_code !== 200) {
+        // Check for HTTP status if available
+        errorMessage = `Image generation failed with status ${response.status_code}.`;
       }
       throw new Error(errorMessage);
     }
-
-    throw new Error('Unexpected API response format or no image URL found.');
+    throw new Error('Unexpected API response or no base64 image data found.');
   } catch (error: any) {
     console.error('Error calling Together API:', error);
     if (error.response && error.response.data && error.response.data.error) {
-      // Axios-like error structure
       throw new Error(
         `API Error (${error.response.status}): ${error.response.data.error.message || error.message}`
       );
     }
-    if (error.message && error.message.includes('authentication')) {
-      // Specific check for auth issues
-      throw new Error('Authentication failed. Please check your API Key.');
+    if (
+      error.message?.toLowerCase().includes('authentication failed') ||
+      error.message?.toLowerCase().includes('api key')
+    ) {
+      throw new Error(
+        'Authentication failed. Please check your API Key and account balance/tier if using Pro models.'
+      );
     }
-    // Re-throw a more generic error if specific parsing fails
+    if (error.message?.toLowerCase().includes('rate limit')) {
+      throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+    }
     throw new Error(`Failed to generate image: ${error.message || 'Unknown error'}`);
   }
 }

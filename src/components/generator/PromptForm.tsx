@@ -2,18 +2,16 @@
 import React from 'react';
 import { RiShuffleLine } from 'react-icons/ri';
 import { PlaceholderKeys, placeholderVariants as allVariants } from '@/utils/placeholderVariants';
-
-// Define types for props matching HomePage's FormState
-interface FormState {
-  [key: string]: string;
-  ALBUM_TITLE: string;
-  // ... other keys from placeholderVariants
-}
+import { type FormState } from '@/types/generator';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Button from '@/components/ui/Button';
+import IconButton from '@/components/ui/IconButton';
 
 interface PromptFormProps {
   formState: FormState;
   setFormState: React.Dispatch<React.SetStateAction<FormState>>;
-  placeholderVariants: typeof allVariants; // Use the imported type
+  placeholderVariants: typeof allVariants;
 }
 
 const PromptForm: React.FC<PromptFormProps> = ({
@@ -26,7 +24,7 @@ const PromptForm: React.FC<PromptFormProps> = ({
   };
 
   const handleRandomize = (fieldName: PlaceholderKeys | 'ALBUM_TITLE') => {
-    if (fieldName === 'ALBUM_TITLE') return; // No predefined variants for title
+    if (fieldName === 'ALBUM_TITLE') return;
 
     const variants = placeholderVariants[fieldName as PlaceholderKeys];
     const randomIndex = Math.floor(Math.random() * variants.length);
@@ -35,16 +33,19 @@ const PromptForm: React.FC<PromptFormProps> = ({
 
   const handleRandomizeAll = () => {
     const newFormState = { ...formState };
-    (Object.keys(placeholderVariants) as PlaceholderKeys[]).forEach(key => {
-      const variants = placeholderVariants[key];
-      const randomIndex = Math.floor(Math.random() * variants.length);
-      newFormState[key] = variants[randomIndex];
+    (Object.keys(placeholderVariants) as Array<keyof typeof placeholderVariants>).forEach(key => {
+      const variants = placeholderVariants[key as PlaceholderKeys];
+
+      if (variants && variants.length > 0) {
+        // Check if variants exist
+        const randomIndex = Math.floor(Math.random() * variants.length);
+        (newFormState as any)[key] = variants[randomIndex];
+      }
     });
-    // Keep album title as is, or you could add a random word generator for it too
     setFormState(newFormState);
   };
 
-  const formFields: { name: keyof FormState; label: string; type: 'text' | 'select' }[] = [
+  const formFields: { name: string; label: string; type: 'text' | 'select' }[] = [
     { name: 'ALBUM_TITLE', label: 'Album Title', type: 'text' },
     { name: 'VISUAL_CONCEPT', label: 'Visual Concept', type: 'select' },
     { name: 'TEXT_PLACEMENT', label: 'Text Placement', type: 'select' },
@@ -60,67 +61,49 @@ const PromptForm: React.FC<PromptFormProps> = ({
     <form className="space-y-6">
       {formFields.map(field => (
         <div key={field.name}>
-          <label
-            htmlFor={field.name}
-            className="text-text-secondary mb-1 block text-sm font-medium"
-          >
-            {field.label}
-          </label>
-          <div className="flex items-center space-x-2">
-            {field.type === 'text' ? (
-              <input
-                type="text"
+          {field.type === 'text' ? (
+            <Input
+              label={field.label}
+              name={field.name}
+              id={field.name}
+              value={formState[field.name]}
+              onChange={handleChange}
+            />
+          ) : (
+            <div className="flex items-end space-x-2">
+              <Select
+                containerClassName="flex-grow"
+                label={field.label}
                 name={field.name}
                 id={field.name}
                 value={formState[field.name]}
                 onChange={handleChange}
-                className="bg-primary-dark/80 text-text-primary focus:ring-accent-blue block w-full rounded-md border-0 px-3 py-2 shadow-sm ring-1 ring-neutral-600 transition-all ring-inset placeholder:text-gray-500 focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                options={
+                  placeholderVariants[field.name as PlaceholderKeys]?.map(option => ({
+                    value: option,
+                    label: option,
+                  })) || []
+                }
               />
-            ) : (
-              <select
-                name={field.name}
-                id={field.name}
-                value={formState[field.name]}
-                onChange={handleChange}
-                className="bg-primary-dark/80 text-text-primary focus:ring-accent-blue block w-full appearance-none rounded-md border-0 bg-right bg-no-repeat px-3 py-2 pr-8 shadow-sm ring-1 ring-neutral-600 transition-all ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: 'right 0.5rem center',
-                  backgroundSize: '1.5em 1.5em',
-                }}
-              >
-                {placeholderVariants[field.name as PlaceholderKeys]?.map(option => (
-                  <option
-                    key={option}
-                    value={option}
-                    className="bg-secondary-dark text-text-primary"
-                  >
-                    {option}
-                  </option>
-                ))}
-              </select>
-            )}
-            {field.type === 'select' && (
-              <button
-                type="button"
+              <IconButton
+                icon={<RiShuffleLine className="h-5 w-5" />}
                 onClick={() => handleRandomize(field.name as PlaceholderKeys)}
-                className="bg-accent-blue/20 hover:bg-accent-blue/40 text-accent-blue rounded-md p-2 transition-colors"
-                title={`Randomize ${field.label}`}
-              >
-                <RiShuffleLine className="h-5 w-5" />
-              </button>
-            )}
-          </div>
+                tooltip={`Randomize ${field.label}`}
+                variant="ghost"
+                className="mb-px"
+              />
+            </div>
+          )}
         </div>
       ))}
-      <button
-        type="button"
+      <Button
         onClick={handleRandomizeAll}
-        className="bg-accent-pink hover:bg-opacity-80 focus:ring-offset-primary-dark focus:ring-accent-pink flex w-full items-center justify-center space-x-2 rounded-md border border-transparent px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:outline-none"
+        iconLeft={<RiShuffleLine className="h-5 w-5" />}
+        className="w-full"
+        variant="secondary"
       >
-        <RiShuffleLine className="h-5 w-5" />
-        <span>Randomize All Fields</span>
-      </button>
+        Randomize All Prompt Fields
+      </Button>
     </form>
   );
 };

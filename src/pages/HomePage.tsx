@@ -1,50 +1,40 @@
 // src/pages/HomePage.tsx
 import React, { useState, useEffect } from 'react';
+import { useAppSelector } from '@/store/hooks';
+import { type FormState, getInitialFormState } from '@/types/generator';
+
 import PromptForm from '@/components/generator/PromptForm';
 import ImageDisplay from '@/components/generator/ImageDisplay';
-import ApiKeyInput from '@/components/generator/ApiKeyInput';
 import { placeholderVariants } from '@/utils/placeholderVariants';
-import { callTogetherApi } from '@/utils/api';
+import { callTogetherApi, type ImageGenerationResult } from '@/utils/api';
+import { imageModels, calculateCost } from '@/utils/modelData';
+import CostCalculatorDisplay from '@/components/generator/CostCalculatorDisplay';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import Card from '@/components/ui/Card';
 
-// Define types for state
-interface FormState {
-  [key: string]: string;
-  ALBUM_TITLE: string;
-  VISUAL_CONCEPT: string;
-  TEXT_PLACEMENT: string;
-  TYPOGRAPHY_STYLE: string;
-  COLOR_SCHEME: string;
-  MOOD_ATMOSPHERE: string;
-  ARTISTIC_STYLE: string;
-  COMPOSITION_DETAILS: string;
-  TECHNICAL_QUALITY: string;
-}
+const COST_CONFIRMATION_THRESHOLD_CENTS = 4; // 4 cents
 
 const HomePage: React.FC = () => {
-  const initialFormState: FormState = {
-    ALBUM_TITLE: '',
-    VISUAL_CONCEPT: placeholderVariants.VISUAL_CONCEPT[0],
-    TEXT_PLACEMENT: placeholderVariants.TEXT_PLACEMENT[0],
-    TYPOGRAPHY_STYLE: placeholderVariants.TYPOGRAPHY_STYLE[0],
-    COLOR_SCHEME: placeholderVariants.COLOR_SCHEME[0],
-    MOOD_ATMOSPHERE: placeholderVariants.MOOD_ATMOSPHERE[0],
-    ARTISTIC_STYLE: placeholderVariants.ARTISTIC_STYLE[0],
-    COMPOSITION_DETAILS: placeholderVariants.COMPOSITION_DETAILS[0],
-    TECHNICAL_QUALITY: placeholderVariants.TECHNICAL_QUALITY[0],
-  };
+  // Get settings from Redux store
+  const {
+    apiKey,
+    defaultPreviewModelId,
+    defaultEnhanceModelId,
+    previewParamsConfig,
+    enhanceParamsConfig,
+  } = useAppSelector(state => state.settings);
 
+  const initialFormState = getInitialFormState(); // Use the imported function
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('togetherApiKey') || '');
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const [enhancedImageUrl, setEnhancedImageUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
+  const [enhancedImageBase64, setEnhancedImageBase64] = useState<string | null>(null);
+  const [currentSeed, setCurrentSeed] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleApiKeyChange = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('togetherApiKey', key);
-  };
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState<boolean>(false);
+  const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
 
   const buildPrompt = (currentFormState: FormState): string => {
     let prompt = `Album cover artwork featuring [VISUAL_CONCEPT]. The title "[ALBUM_TITLE]" appears [TEXT_PLACEMENT] rendered in [TYPOGRAPHY_STYLE]. [COLOR_SCHEME] creates [MOOD_ATMOSPHERE]. [ARTISTIC_STYLE] with [COMPOSITION_DETAILS]. [TECHNICAL_QUALITY].`;
@@ -58,71 +48,151 @@ const HomePage: React.FC = () => {
     setGeneratedPrompt(buildPrompt(formState));
   }, [formState]);
 
-  const handleGenerate = async (type: 'preview' | 'enhance') => {
+  const [expectedCost, setExpectedCost] = useState<number | null>(null);
+  const [showCostConfirmation, setShowCostConfirmation] = useState<boolean>(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+
+  const generateNewSeed = () => Math.floor(Math.random() * 4294967296);
+
+  const handleActualGeneration = async (type: 'preview' | 'enhance') => {
     if (!apiKey) {
-      setError('Please enter your Together API Key.');
+      // API Key from Redux
+      setError('API Key not set. Please configure it in settings.');
       return;
     }
     setError(null);
-    setIsLoading(true);
-    setEnhancedImageUrl(null); // Clear enhanced if generating new preview
-    if (type === 'preview') setPreviewImageUrl(null);
+    if (type === 'preview') setIsGeneratingPreview(true);
+    else setIsEnhancing(true);
 
-    // Inside HomePage.tsx, in handleGenerate function:
+    const seedToUse = currentSeed && type === 'enhance' ? currentSeed : generateNewSeed();
+
     const currentPrompt = buildPrompt(formState);
-    console.log('Generating with prompt:', currentPrompt); // Already there
+    const modelToUse = type === 'preview' ? defaultPreviewModelId : defaultEnhanceModelId;
+    const paramsToUse = type === 'preview' ? previewParamsConfig : enhanceParamsConfig;
+
+    // Ensure currentSeed is updated with the seed being used for this generation
+    setCurrentSeed(seedToUse);
 
     try {
-      const imageUrl = await callTogetherApi({
+      const result: ImageGenerationResult = await callTogetherApi({
         apiKey,
         prompt: currentPrompt,
-        generationType: type,
-        referenceImageUrl: type === 'enhance' ? previewImageUrl : null,
-        // Optionally, pass other parameters if you add them to UI/state:
-        // width: 1024,
-        // height: 1024,
-        // steps: type === 'preview' ? 20 : 40, // Or get from state
-        // guidance: type === 'enhance' ? 5 : undefined, // Or get from state
+        modelId: modelToUse,
+        width: paramsToUse.width,
+        height: paramsToUse.height,
+        steps: paramsToUse.steps,
+        guidance: paramsToUse.guidance,
+        seed: seedToUse,
       });
 
       if (type === 'preview') {
-        setPreviewImageUrl(imageUrl);
-        setEnhancedImageUrl(null);
+        setPreviewImageBase64(result.imageDataBase64);
+        setEnhancedImageBase64(null); // Clear enhanced if new preview
       } else {
-        setEnhancedImageUrl(imageUrl);
+        setEnhancedImageBase64(result.imageDataBase64);
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred during image generation.');
       console.error(err);
     } finally {
-      setIsLoading(false);
+      if (type === 'preview') setIsGeneratingPreview(false);
+      else setIsEnhancing(false);
+    }
+  };
+
+  const preGenerationCheck = (type: 'preview' | 'enhance') => {
+    const modelId = type === 'preview' ? defaultPreviewModelId : defaultEnhanceModelId;
+    const params = type === 'preview' ? previewParamsConfig : enhanceParamsConfig;
+    const costForOperation = calculateCost(modelId, params.width, params.height, params.steps);
+
+    setExpectedCost(costForOperation); // Set this for the modal
+
+    if (costForOperation !== null && costForOperation > COST_CONFIRMATION_THRESHOLD_CENTS) {
+      setConfirmAction(() => () => handleActualGeneration(type));
+      setShowCostConfirmation(true);
+    } else {
+      handleActualGeneration(type);
     }
   };
 
   return (
-    <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
-      <div className="bg-secondary-dark/30 glassmorphic space-y-6 rounded-xl border border-neutral-700 p-6 shadow-xl">
-        <ApiKeyInput apiKey={apiKey} onChange={handleApiKeyChange} />
-        <PromptForm
-          formState={formState}
-          setFormState={setFormState}
-          placeholderVariants={placeholderVariants}
-        />
-        <div className="bg-primary-dark mt-4 rounded-lg border border-neutral-600 p-4">
-          <h3 className="text-accent-blue mb-2 text-sm font-semibold">Generated Prompt:</h3>
-          <p className="text-text-secondary text-xs break-all">{generatedPrompt}</p>
-        </div>
-        {error && <p className="text-sm text-red-500">{error}</p>}
-      </div>
+    <>
+      <div className="grid grid-cols-1 items-start gap-6 md:gap-8 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          {!apiKey && (
+            <div className="mb-4 rounded-lg bg-yellow-800/30 p-3 text-sm text-yellow-300">
+              API Key not set. Please configure it in the settings panel (gear icon in header).
+            </div>
+          )}
 
-      <ImageDisplay
-        previewImageUrl={previewImageUrl}
-        enhancedImageUrl={enhancedImageUrl}
-        isLoading={isLoading}
-        onGeneratePreview={() => handleGenerate('preview')}
-        onEnhance={() => handleGenerate('enhance')}
-      />
-    </div>
+          <div className="bg-primary-dark/50 mb-6 rounded-lg border border-neutral-700 p-3">
+            <p className="text-text-secondary text-xs">
+              Using default models & parameters configured in Settings:
+            </p>
+            <p className="text-text-primary text-sm">
+              Preview:{' '}
+              <span className="text-accent-blue font-semibold">
+                {imageModels.find(m => m.id === defaultPreviewModelId)?.name ||
+                  defaultPreviewModelId}
+              </span>
+            </p>
+            <p className="text-text-primary text-sm">
+              Enhance:{' '}
+              <span className="text-accent-pink font-semibold">
+                {imageModels.find(m => m.id === defaultEnhanceModelId)?.name ||
+                  defaultEnhanceModelId}
+              </span>
+            </p>
+          </div>
+
+          <PromptForm
+            formState={formState}
+            setFormState={setFormState}
+            placeholderVariants={placeholderVariants}
+          />
+          <Card className="bg-primary-dark/70 mt-6 !p-4">
+            <h3 className="text-accent-blue mb-2 text-sm font-semibold">Generated Prompt:</h3>
+            <p className="text-text-secondary text-xs break-all">{generatedPrompt}</p>
+          </Card>
+          {error && (
+            <p className="mt-4 rounded-lg bg-red-900/30 p-3 text-sm text-red-500">{error}</p>
+          )}
+        </Card>
+
+        <div className="sticky top-24 space-y-6 lg:col-span-1">
+          <ImageDisplay
+            previewImageBase64={previewImageBase64}
+            enhancedImageBase64={enhancedImageBase64}
+            isPreviewLoading={isGeneratingPreview}
+            isEnhanceLoading={isEnhancing}
+            albumName={formState.ALBUM_TITLE}
+            onGeneratePreview={() => preGenerationCheck('preview')}
+            onEnhance={() => preGenerationCheck('enhance')}
+          />
+          <CostCalculatorDisplay
+            activeModelId={defaultPreviewModelId}
+            activeParams={previewParamsConfig}
+            operationTypeLabel="Default Preview"
+          />
+        </div>
+      </div>
+      {showCostConfirmation && (
+        <ConfirmationModal
+          isOpen={showCostConfirmation}
+          title="Cost Confirmation"
+          message={`The estimated cost for this generation is ${(expectedCost! / 100).toFixed(4)} USD (${expectedCost?.toFixed(2)} cents). Do you want to proceed?`}
+          onConfirm={() => {
+            if (confirmAction) confirmAction();
+            setShowCostConfirmation(false);
+            setConfirmAction(null);
+          }}
+          onCancel={() => {
+            setShowCostConfirmation(false);
+            setConfirmAction(null);
+          }}
+        />
+      )}
+    </>
   );
 };
 
