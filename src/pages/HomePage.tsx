@@ -1,8 +1,7 @@
 // src/pages/HomePage.tsx
 import React, { useState, useEffect } from 'react';
-import { useAppSelector } from '@/store/hooks';
 import { type FormState, getInitialFormState } from '@/types/generator';
-
+import { useAppSelector } from '@/store/hooks';
 import PromptForm from '@/components/generator/PromptForm';
 import ImageDisplay from '@/components/generator/ImageDisplay';
 import { placeholderVariants } from '@/utils/placeholderVariants';
@@ -11,6 +10,10 @@ import { imageModels, calculateCost } from '@/utils/modelData';
 import CostCalculatorDisplay from '@/components/generator/CostCalculatorDisplay';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Card from '@/components/ui/Card';
+import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
+import { base64ToBlob } from '@/utils/imageUtils'; // Import the helper
+import Button from '@/components/ui/Button'; // Your Button component
+import { RiSaveLine } from 'react-icons/ri';
 
 const COST_CONFIRMATION_THRESHOLD_CENTS = 4; // 4 cents
 
@@ -24,7 +27,7 @@ const HomePage: React.FC = () => {
     enhanceParamsConfig,
   } = useAppSelector(state => state.settings);
 
-  const initialFormState = getInitialFormState(); // Use the imported function
+  const initialFormState = getInitialFormState();
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
 
@@ -35,6 +38,11 @@ const HomePage: React.FC = () => {
 
   const [isGeneratingPreview, setIsGeneratingPreview] = useState<boolean>(false);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
+
+  const user = useAppSelector(state => state.auth.user);
+  const [isSavingCover, setIsSavingCover] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
   const buildPrompt = (currentFormState: FormState): string => {
     let prompt = `Album cover artwork featuring [VISUAL_CONCEPT]. The title "[ALBUM_TITLE]" appears [TEXT_PLACEMENT] rendered in [TYPOGRAPHY_STYLE]. [COLOR_SCHEME] creates [MOOD_ATMOSPHERE]. [ARTISTIC_STYLE] with [COMPOSITION_DETAILS]. [TECHNICAL_QUALITY].`;
@@ -97,6 +105,88 @@ const HomePage: React.FC = () => {
     } finally {
       if (type === 'preview') setIsGeneratingPreview(false);
       else setIsEnhancing(false);
+    }
+  };
+
+  const handleSaveCover = async () => {
+    if (!user) {
+      setError('You must be logged in to save covers.');
+      return;
+    }
+
+    const imageToSaveBase64 = enhancedImageBase64 || previewImageBase64;
+    if (!imageToSaveBase64) {
+      setError('No image generated to save.');
+      return;
+    }
+    if (!currentSeed) {
+      setError('Image seed is not available. Cannot save reliably.');
+      // Or allow saving without seed but with a warning.
+      return;
+    }
+
+    setIsSavingCover(true);
+    setSaveError(null);
+    setSaveSuccessMessage(null);
+
+    const currentModelId = enhancedImageBase64 ? defaultEnhanceModelId : defaultPreviewModelId;
+    const currentParams = enhancedImageBase64 ? enhanceParamsConfig : previewParamsConfig;
+    const sanitizedAlbumTitle =
+      formState.ALBUM_TITLE.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'untitled_album';
+    const fileExtension = 'png'; // Assuming PNG from base64
+    const fileName = `${Date.now()}_${sanitizedAlbumTitle}_${currentSeed}.${fileExtension}`;
+    const filePath = `${user.id}/${fileName}`; // Path in Supabase storage: user_id/filename.png
+
+    try {
+      // 1. Upload image to Supabase Storage
+      const imageBlob = base64ToBlob(imageToSaveBase64);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('album-covers')
+        .upload(filePath, imageBlob, {
+          cacheControl: '3600', // Optional
+          upsert: false, // Don't upsert if file exists, generate unique name instead
+        });
+
+      if (uploadError) throw uploadError;
+      if (!uploadData) throw new Error('Upload failed, no data returned.');
+
+      // 2. Save metadata to Supabase Database
+      const coverMetadata = {
+        user_id: user.id,
+        album_title: formState.ALBUM_TITLE || 'Untitled',
+        prompt_text: generatedPrompt,
+        model_id: currentModelId,
+        seed: currentSeed,
+        width: currentParams.width,
+        height: currentParams.height,
+        steps: currentParams.steps,
+        guidance: currentParams.guidance,
+        image_storage_path: uploadData.path, // Use the path returned by storage
+        // Framework params
+        framework_visual_concept: formState.VISUAL_CONCEPT,
+        framework_text_placement: formState.TEXT_PLACEMENT,
+        framework_typography_style: formState.TYPOGRAPHY_STYLE,
+        framework_color_scheme: formState.COLOR_SCHEME,
+        framework_mood_atmosphere: formState.MOOD_ATMOSPHERE,
+        framework_artistic_style: formState.ARTISTIC_STYLE,
+        framework_composition_details: formState.COMPOSITION_DETAILS,
+        framework_technical_quality: formState.TECHNICAL_QUALITY,
+      };
+
+      const { error: insertError } = await supabase
+        .from('generated_covers')
+        .insert([coverMetadata]);
+
+      if (insertError) throw insertError;
+
+      setSaveSuccessMessage('Cover saved successfully!');
+      // Optionally, clear the image or show a "Saved!" state
+      // setTimeout(() => setSaveSuccessMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Error saving cover:', error);
+      setSaveError(error.message || 'Failed to save cover.');
+    } finally {
+      setIsSavingCover(false);
     }
   };
 
@@ -174,6 +264,24 @@ const HomePage: React.FC = () => {
             activeParams={previewParamsConfig}
             operationTypeLabel="Default Preview"
           />
+          {(previewImageBase64 || enhancedImageBase64) && user && (
+            <Card className="!bg-primary-dark/50 !p-4">
+              <Button
+                onClick={handleSaveCover}
+                isLoading={isSavingCover}
+                disabled={isSavingCover}
+                iconLeft={<RiSaveLine className="h-5 w-5" />}
+                className="w-full"
+                variant="primary"
+              >
+                Save to My Covers
+              </Button>
+              {saveError && <p className="mt-2 text-center text-xs text-red-400">{saveError}</p>}
+              {saveSuccessMessage && (
+                <p className="mt-2 text-center text-xs text-green-400">{saveSuccessMessage}</p>
+              )}
+            </Card>
+          )}
         </div>
       </div>
       {showCostConfirmation && (

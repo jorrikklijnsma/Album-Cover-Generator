@@ -1,45 +1,72 @@
 // src/App.tsx
-import { useEffect } from 'react';
-import { useAppDispatch } from './store/hooks';
+import React, { JSX, useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from './store/hooks';
 import { setUserAndSession, checkUserSession } from './store/authSlice';
 import { supabase } from './lib/supabaseClient';
 import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
+import MyCoversPage from './pages/MyCoversPage';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import SettingsPanel from './components/settings/SettingsPanel';
-import { useAppSelector } from './store/hooks';
-import { useState } from 'react';
+import LoadingSpinner from './components/ui/LoadingSpinner';
+
+// ProtectedRoute component
+const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
+  const user = useAppSelector(state => state.auth.user);
+  const loading = useAppSelector(state => state.auth.loading);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+  return user ? children : <Navigate to="/auth" replace />;
+};
 
 function App() {
   const dispatch = useAppDispatch();
-  const user = useAppSelector(state => state.auth.user);
+  const user = useAppSelector(state => state.auth.user); // For conditional rendering in main layout if needed
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
-    // Check initial session
     dispatch(checkUserSession());
-
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user || null;
-      dispatch(setUserAndSession({ user: currentUser, session }));
-      // If user logs in/out, you might want to re-fetch settings or profile
+      dispatch(setUserAndSession({ user: session?.user ?? null, session }));
     });
-
     return () => {
-      // authListener?.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
   }, [dispatch]);
 
   return (
-    <div className="bg-aurora flex min-h-screen flex-col bg-cover bg-no-repeat">
-      <Header onOpenSettings={() => setIsSettingsOpen(true)} /> {/* Pass handler for settings */}
-      <main className="container mx-auto flex-grow px-4 py-8">
-        {user ? <HomePage /> : <AuthPage />}
-      </main>
-      <Footer />
-      <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-    </div>
+    <Router>
+      {/* Wrap with Router */}
+      <div className="bg-aurora flex min-h-screen flex-col bg-cover bg-no-repeat">
+        <Header onOpenSettings={() => setIsSettingsOpen(true)} />
+        <main className="container mx-auto flex-grow px-4 py-8">
+          <Routes>
+            <Route path="/" element={user ? <HomePage /> : <Navigate to="/auth" replace />} />
+            <Route path="/auth" element={!user ? <AuthPage /> : <Navigate to="/" replace />} />
+            <Route
+              path="/my-covers"
+              element={
+                <ProtectedRoute>
+                  <MyCoversPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Add other routes here */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+        <Footer />
+        <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      </div>
+    </Router>
   );
 }
 

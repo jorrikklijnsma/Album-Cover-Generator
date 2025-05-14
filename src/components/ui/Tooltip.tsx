@@ -22,10 +22,10 @@ const Tooltip: React.FC<TooltipProps> = ({
   };
 
   return (
-    <div className={`group relative flex ${className}`}>
+    <div className={`group/tooltip relative flex ${className}`}>
       {children}
       <div
-        className={`absolute ${positionClasses[position]} pointer-events-none z-50 w-max max-w-xs rounded-md bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100`}
+        className={`absolute ${positionClasses[position]} pointer-events-none z-50 w-max max-w-xs rounded-md bg-neutral-900 px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover/tooltip:opacity-100`}
       >
         {content}
       </div>
