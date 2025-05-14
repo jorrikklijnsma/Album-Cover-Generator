@@ -1,0 +1,59 @@
+{
+  "name": "core-front-end-basic",
+  "description": "Basic React frontend application template with Vite, TypeScript and Tailwind CSS",
+  "version": "1.0.0",
+  "created": "2025-04-28T14:30:00Z",
+  "author": "SNPP",
+  "ai": {
+    "projectStructure": {
+      "description": "This is a basic React frontend application built with Vite, TypeScript, and Tailwind CSS with the following structure:",
+      "details": [
+        "/ - Root directory contains configuration files and package information",
+        "/index.html - HTML entry point for the application",
+        "/src/ - Source code for the React application",
+        "/src/main.tsx - Main entry point that renders the React application",
+        "/src/App.tsx - Root React component",
+        "/src/components/ - Reusable React components",
+        "/src/components/layout/ - Layout components like headers, footers, etc.",
+        "/src/components/ui/ - UI components like buttons, inputs, etc.",
+        "/src/pages/ - Page components representing different routes",
+        "/src/styles/ - CSS and styling files including Tailwind configuration",
+        "/src/utils/ - Utility functions and helpers",
+        "/public/ - Static assets that are served directly"
+      ]
+    },
+    "techStack": {
+      "languages": ["TypeScript", "JavaScript", "HTML", "CSS"],
+      "frameworks": ["React 19"],
+      "buildTools": ["Vite 6.3"],
+      "styling": ["Tailwind CSS 4.1"],
+      "assets": ["React Icons 5.5"],
+      "devTools": ["ESLint", "Prettier"],
+      "versionControl": ["Git", "GitHub"]
+    },
+    "bestPractices": [
+      "Use functional components with hooks for React development",
+      "Implement TypeScript for type safety and better developer experience",
+      "Follow a consistent component structure throughout the application",
+      "Use path aliases (@/) for clean imports",
+      "Separate UI components from layout components",
+      "Implement responsive design with Tailwind CSS",
+      "Use ESLint and Prettier for code quality and consistency"
+    ],
+    "commonPatterns": [
+      "Components are organized by function (UI, layout) and usage (pages)",
+      "Styles are managed through Tailwind utility classes",
+      "TypeScript interfaces define props for components",
+      "Utility functions are centralized in the utils directory",
+      "Layout components provide structure while UI components provide functionality"
+    ],
+    "developmentWorkflow": {
+      "setup": "Run npm install to install dependencies",
+      "development": "Use npm run dev to start the development server",
+      "building": "Use npm run build to build for production",
+      "linting": "Use npm run lint to check for code issues",
+      "formatting": "Use npm run format to format code with Prettier",
+      "extension": "Add new components in appropriate directories and import as needed"
+    }
+  }
+}
