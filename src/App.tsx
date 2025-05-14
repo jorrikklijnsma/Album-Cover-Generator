@@ -32,6 +32,28 @@ function App() {
   const user = useAppSelector(state => state.auth.user); // For conditional rendering in main layout if needed
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // src/App.tsx
+  useEffect(() => {
+    console.log('App.tsx: Setting up onAuthStateChange listener.');
+    dispatch(checkUserSession()); // Check existing session first
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('App.tsx: onAuthStateChange triggered!', { _event, session });
+      const currentUser = session?.user || null;
+      dispatch(setUserAndSession({ user: currentUser, session }));
+      if (currentUser) {
+        console.log('App.tsx: User session established:', currentUser.email);
+      } else {
+        console.log('App.tsx: No user session or user logged out.');
+      }
+    });
+
+    return () => {
+      console.log('App.tsx: Cleaning up onAuthStateChange listener.');
+      authListener.subscription.unsubscribe();
+    };
+  }, [dispatch]);
+
   useEffect(() => {
     dispatch(checkUserSession());
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -59,7 +81,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* Add other routes here */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
