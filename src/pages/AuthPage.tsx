@@ -66,7 +66,6 @@ const AuthPage: React.FC = () => {
       dispatch(setAuthError(error.message));
       dispatch(setAuthLoading(false));
     }
-    // Supabase handles the redirect and onAuthStateChange will pick it up.
   };
 
   return (

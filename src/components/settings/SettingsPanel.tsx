@@ -137,7 +137,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
               size="sm"
               iconRight={showKey ? <RiEyeCloseLine /> : <RiEyeLine />}
             >
-              {showKey ? 'Show Api key' : 'Hide API Key'}
+              {showKey ? 'Hide Api key' : 'Show API Key'}
             </Button>
             <Button onClick={handleSaveApiKey} className="mt-3 w-full" size="sm">
               Save API Key
