@@ -81,9 +81,9 @@ export async function callTogetherApi({
         imageDataBase64: response.data[0].b64_json,
         seed: seed, // Return the seed we sent
       };
-    } else if (response.error) {
+    } else if ((response as any).error) {
       throw new Error(
-        `Together API Error: ${response.error.message || JSON.stringify(response.error)}`
+        `Together API Error: ${(response as any).error.message || JSON.stringify((response as any).error)}`
       );
     } else if (!response.data || response.data.length === 0) {
       let errorMessage = 'Image generation failed: No data returned from API.';
@@ -91,9 +91,9 @@ export async function callTogetherApi({
         errorMessage = `Image generation failed: ${(response as any).message}`;
       } else if ((response as any).detail) {
         errorMessage = `Image generation failed: ${(response as any).detail}`;
-      } else if (response.status_code && response.status_code !== 200) {
+      } else if ((response as any).status_code && (response as any).status_code !== 200) {
         // Check for HTTP status if available
-        errorMessage = `Image generation failed with status ${response.status_code}.`;
+        errorMessage = `Image generation failed with status ${(response as any).status_code}.`;
       }
       throw new Error(errorMessage);
     }

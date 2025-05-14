@@ -2,19 +2,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { imageModels, ModelParameterConstraints } from '@/utils/modelData';
 
-// Helper to get default constraints or fallback
-const getDefaultConstraints = (modelId?: string): ModelParameterConstraints => {
-  const model = imageModels.find(m => m.id === modelId);
-  if (model) return model.constraints;
-  // Fallback constraints if no model or model has no constraints (should not happen with good modelData)
-  return {
-    steps: { min: 1, max: 100, default: 20 },
-    width: { min: 256, max: 1024, default: 1024, step: 64 },
-    height: { min: 256, max: 1024, default: 1024, step: 64 },
-    guidance: { min: 1, max: 20, default: 7, step: 0.5 },
-  };
-};
-
 export interface GenerationParams {
   width: number;
   height: number;

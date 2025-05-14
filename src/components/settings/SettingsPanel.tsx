@@ -17,7 +17,6 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import { RiCloseLine, RiEyeCloseLine, RiEyeLine, RiKey2Line } from 'react-icons/ri';
-import IconButton from '../ui/IconButton';
 
 interface SettingsPanelProps {
   isOpen: boolean;

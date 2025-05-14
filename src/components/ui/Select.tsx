@@ -7,6 +7,7 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
   containerClassName?: string;
   options: { value: string | number; label: string; disabled?: boolean }[];
+  placeholder?: string;
 }
 
 const Select: React.FC<SelectProps> = ({
@@ -16,6 +17,7 @@ const Select: React.FC<SelectProps> = ({
   className = '',
   containerClassName = '',
   id,
+  placeholder,
   ...props
 }) => {
   const generatedId = useId();
@@ -37,9 +39,9 @@ const Select: React.FC<SelectProps> = ({
           className={`${baseSelectStyles} ${error ? 'ring-red-500 focus:ring-red-500' : ''} ${className}`}
           {...props}
         >
-          {props.placeholder && (
+          {placeholder && (
             <option value="" disabled>
-              {props.placeholder}
+              {placeholder}
             </option>
           )}
           {options.map(option => (
